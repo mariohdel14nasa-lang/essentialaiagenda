@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Essential AI Agenda & Scanner</title>
+  
+  <!-- PWA & Color System -->
+  <meta name="theme-color" content="#181621">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Essential Agenda">
+
+  <!-- External Libraries -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              bg: '#181621',
+              card: '#242030',
+              cardHover: '#2f2a3e',
+              modal: '#38324a',
+              purple: '#bf5af2',
+              purpleGlow: 'rgba(191, 90, 242, 0.35)',
+              cyan: '#32ade6',
+              emerald: '#30d158',
+              yellow: '#ffd60a',
+              red: '#ff453a',
+              orange: '#ff9f0a'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
+          },
+          borderRadius: {
+            'pill': '9999px',
+            'essential-xl': '24px',
+            'essential-lg': '18px',
+            'essential-md': '12px'
+          },
+          boxShadow: {
+            'glow-purple': '0 8px 30px -4px rgba(191, 90, 242, 0.35)',
+            'glow-cyan': '0 8px 30px -4px rgba(50, 173, 230, 0.35)',
+            'glass': '0 20px 50px rgba(0, 0, 0, 0.45)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      background-color: #181621;
+      background: radial-gradient(circle at 50% -20%, #342d45 0%, #13111b 100%);
+      color: #ffffff;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .glass-panel {
+      background: rgba(36, 32, 48, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-input {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .glass-input:focus {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: #bf5af2;
+      box-shadow: 0 0 15px rgba(191, 90, 242, 0.25);
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+  </style>
+</head>
+<body class="flex flex-col h-screen w-screen overflow-hidden antialiased text-white select-none">
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-[#242030] text-white text-xs font-semibold px-5 py-3 rounded-pill border border-white/10 shadow-glass flex items-center gap-3 transition-all duration-300 opacity-0 pointer-events-none transform -translate-y-4">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-brand-emerald text-sm"></i>
+    <span id="toast-message">Notificación</span>
+  </div>
+
+  <!-- HEADER -->
+  <header class="flex items-center justify-between px-4 sm:px-6 py-3 glass-panel border-b border-white/10 z-20 shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-purple to-brand-cyan p-0.5 shadow-glow-purple">
+        <div class="w-full h-full bg-[#181621] rounded-[14px] flex items-center justify-center">
+          <i class="fa-solid fa-brain text-brand-purple text-base"></i>
+        </div>
+      </div>
+      <div>
+        <h1 class="text-sm sm:text-base font-bold tracking-tight text-white flex items-center gap-2">
+          Essential AI Agenda
+          <span id="todayBadge" class="text-[10px] bg-brand-purple/20 text-brand-purple border border-brand-purple/30 px-2.5 py-0.5 rounded-pill font-mono font-semibold">Hoy: --/--/----</span>
+        </h1>
+        <p id="p2pStatusLabel" class="text-[11px] text-white/50 font-medium flex items-center gap-1.5 mt-0.5">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse" id="p2pDot"></span> Sincronización P2P Lista
+        </p>
+      </div>
+    </div>
+
+    <!-- HEADER ACTIONS -->
+    <div class="flex items-center gap-2">
+      <button onclick="openCameraModal()" class="px-3.5 py-2 bg-gradient-to-r from-brand-purple to-purple-600 hover:opacity-90 text-white rounded-pill text-xs font-bold shadow-glow-purple flex items-center gap-2 transition-all active:scale-95">
+        <i class="fa-solid fa-camera text-xs"></i>
+        <span class="hidden sm:inline">Escanear Agenda</span>
+      </button>
+
+      <!-- BOTÓN DE CALIBRACIÓN DE LETRA -->
+      <button onclick="openCalibrationModal()" class="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-brand-purple transition-all relative" title="Calibración de Letra Manuscrita">
+        <i class="fa-solid fa-pen-nib text-xs"></i>
+        <span id="calibrationActiveDot" class="w-2 h-2 rounded-full bg-brand-emerald absolute top-1 right-1 border border-[#181621]"></span>
+      </button>
+
+      <button onclick="openP2PModal()" class="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-brand-cyan transition-all" title="Sincronizar P2P">
+        <i class="fa-solid fa-satellite-dish text-xs"></i>
+      </button>
+
+      <button onclick="openExportModal()" class="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-brand-yellow transition-all" title="Exportar Texto">
+        <i class="fa-solid fa-share-nodes text-xs"></i>
+      </button>
+
+      <button onclick="openSettingsModal()" class="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-all" title="Ajustes de IA Gemini">
+        <i class="fa-solid fa-gear text-xs"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- AI QUICK INPUT BAR -->
+  <section class="px-4 sm:px-6 pt-3 pb-1 max-w-7xl mx-auto w-full shrink-0">
+    <div class="relative glass-panel rounded-essential-xl p-1.5 border border-white/10 flex items-center gap-2 shadow-lg">
+      <div class="pl-3 text-brand-purple text-sm">
+        <i class="fa-solid fa-wand-magic-sparkles animate-pulse"></i>
+      </div>
+      <input type="text" id="aiQuickInput" onkeydown="handleQuickAIInput(event)" placeholder="Escribe rápido: ej. 'Cita médica mañana a las 16:00' o 'Comprar pan hoy'..." class="w-full bg-transparent text-xs text-white placeholder-white/40 focus:outline-none py-2 pr-2">
+      <button onclick="processQuickAIInput()" class="px-3.5 py-1.5 bg-brand-purple hover:bg-purple-600 text-white rounded-pill text-xs font-semibold shadow-glow-purple shrink-0 transition-all flex items-center gap-1.5">
+        <span>Añadir</span>
+        <i class="fa-solid fa-arrow-right text-[10px]"></i>
+      </button>
+    </div>
+  </section>
+
+  <!-- MAIN CONTAINER GRID -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 overflow-hidden max-w-7xl mx-auto w-full">
+
+    <!-- LEFT COLUMN: CALENDAR & DAY EVENTS -->
+    <section class="lg:col-span-5 glass-panel rounded-essential-xl p-4 sm:p-5 flex flex-col h-full overflow-hidden border border-white/10 shadow-glass">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-calendar-days text-brand-cyan text-sm"></i>
+          <h2 class="font-bold text-xs sm:text-sm text-white tracking-wide">Calendario</h2>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button onclick="goToToday()" class="px-2.5 py-1 text-[10px] bg-white/5 hover:bg-white/10 border border-white/10 rounded-pill font-semibold text-white/80 transition-all">Hoy</button>
+          <button onclick="changeMonth(-1)" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs text-white/70 transition-all"><i class="fa-solid fa-chevron-left"></i></button>
+          <span id="currentMonthLabel" class="text-xs font-bold px-1 text-white font-mono">Mes 2026</span>
+          <button onclick="changeMonth(1)" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs text-white/70 transition-all"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">
+        <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+      </div>
+      
+      <div id="calendarDaysGrid" class="grid grid-cols-7 gap-1 flex-1 overflow-y-auto no-scrollbar auto-rows-fr min-h-[180px]"></div>
+
+      <div class="mt-3 pt-3 border-t border-white/10 flex flex-col max-h-[170px]">
+        <div class="flex justify-between items-center mb-2">
+          <h3 id="selectedDateTitle" class="text-xs font-bold text-brand-cyan flex items-center gap-1.5">
+            <i class="fa-solid fa-clock text-[10px]"></i> Citas del Día
+          </h3>
+          <span id="calendarCountBadge" class="text-[10px] bg-white/10 px-2 py-0.5 rounded-pill font-mono font-semibold text-white/80">0 citas</span>
+        </div>
+        <div id="calendarDayEventsList" class="space-y-1.5 overflow-y-auto pr-1 no-scrollbar flex-1"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: AI ORGANIZED TASK LIST -->
+    <section class="lg:col-span-7 glass-panel rounded-essential-xl p-4 sm:p-5 flex flex-col h-full overflow-hidden border border-white/10 shadow-glass">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-list-check text-brand-emerald text-sm"></i>
+          <div>
+            <h2 class="font-bold text-xs sm:text-sm text-white tracking-wide">Lista de Tareas</h2>
+            <span class="text-[10px] text-white/40 font-medium">Clasificación inteligente integrada</span>
+          </div>
+        </div>
+        <button onclick="openTaskModal()" class="text-xs bg-brand-purple/20 hover:bg-brand-purple/30 border border-brand-purple/40 px-3 py-1.5 rounded-pill text-brand-purple font-semibold flex items-center gap-1.5 transition-all shadow-glow-purple">
+          <i class="fa-solid fa-plus text-[10px]"></i> Nueva Tarea
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-1 bg-white/5 p-1 rounded-pill border border-white/5">
+          <button onclick="filterTodoList('all')" id="filterAll" class="px-3 py-1 rounded-pill text-[11px] font-semibold bg-brand-purple text-white transition-all shadow-sm">Todas</button>
+          <button onclick="filterTodoList('pending')" id="filterPending" class="px-3 py-1 rounded-pill text-[11px] font-semibold text-white/60 hover:text-white transition-all">Pendientes</button>
+          <button onclick="filterTodoList('completed')" id="filterCompleted" class="px-3 py-1 rounded-pill text-[11px] font-semibold text-white/60 hover:text-white transition-all">Completadas</button>
+        </div>
+        
+        <div class="relative flex-1 max-w-xs">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/40"></i>
+          <input type="text" id="taskSearchInput" oninput="renderTodoList()" placeholder="Buscar en tareas..." class="w-full bg-white/5 border border-white/10 rounded-pill pl-8 pr-3 py-1 text-xs text-white placeholder-white/30 focus:outline-none focus:border-brand-cyan transition-all">
+        </div>
+      </div>
+
+      <div id="todoListContainer" class="flex-1 overflow-y-auto space-y-2 pr-1 no-scrollbar"></div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: CAMERA SCANNER & OCR/AI -->
+  <div id="cameraModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-3 sm:p-4">
+    <div class="bg-[#2a2438] border border-white/10 rounded-essential-xl w-full max-w-xl overflow-hidden shadow-glass flex flex-col max-h-[92vh]">
+      <div class="px-5 py-3.5 border-b border-white/10 flex justify-between items-center bg-[#1e1b26]/60">
+        <h3 class="font-bold text-white text-sm sm:text-base flex items-center gap-2">
+          <i class="fa-solid fa-camera text-brand-purple"></i> Escanear Agenda con Visión IA
+        </h3>
+        <button onclick="closeCameraModal()" class="text-white/60 hover:text-white p-1 rounded-lg transition-all"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 no-scrollbar">
+        <!-- Indicador de Calibración Activa -->
+        <div class="bg-brand-purple/10 border border-brand-purple/30 rounded-xl p-3 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-brand-purple/20 flex items-center justify-center text-brand-purple">
+              <i class="fa-solid fa-sliders text-xs"></i>
+            </div>
+            <div>
+              <span class="text-[10px] uppercase font-bold text-brand-purple tracking-wider block">Perfil de Caligrafía Activo</span>
+              <span id="activeProfileLabelModal" class="text-xs font-semibold text-white">Mi Letra Estándar (Calibrado)</span>
+            </div>
+          </div>
+          <button onclick="closeCameraModal(); openCalibrationModal();" class="text-[11px] text-brand-cyan hover:underline font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-pen-nib"></i> Cambiar / Calibrar
+          </button>
+        </div>
+
+        <p class="text-xs text-white/70 leading-relaxed">
+          Fotografía una página manuscrita o impresa de tu agenda física. El motor de visión extrae y clasifica tus notas aplicando el perfil de caligrafía calibrado.
+        </p>
+        
+        <div id="cameraViewContainer" class="relative rounded-essential-md overflow-hidden bg-black/60 aspect-video flex items-center justify-center border border-white/10 group">
+          <video id="cameraVideo" autoplay playsinline class="w-full h-full object-cover hidden"></video>
+          <canvas id="cameraCanvas" class="hidden"></canvas>
+          <img id="imagePreview" class="w-full h-full object-contain hidden" />
+          
+          <div id="cameraPlaceholder" class="flex flex-col items-center justify-center text-white/40 space-y-2 p-6 text-center">
+            <i class="fa-solid fa-camera-retro text-4xl mb-1 text-white/20"></i>
+            <span class="text-xs font-medium">Usa la cámara o sube un archivo</span>
+          </div>
+
+          <div id="aiAnalysisLoader" class="absolute inset-0 bg-black/85 backdrop-blur-sm hidden flex flex-col items-center justify-center p-6 text-center z-10">
+            <div class="w-12 h-12 border-4 border-brand-purple border-t-transparent rounded-full animate-spin mb-3"></div>
+            <h4 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-wand-magic-sparkles text-brand-purple animate-bounce"></i> Analizando visión de agenda...
+            </h4>
+            <p id="aiProgressText" class="text-xs text-white/60 mt-1">Aplicando corrección de caligrafía y clasificando tareas</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 sm:gap-3">
+          <button onclick="startCamera()" id="btnStartCam" class="py-2.5 bg-[#1e1b26] hover:bg-white/10 text-white rounded-xl text-xs font-semibold border border-white/10 flex items-center justify-center gap-2 transition-all">
+            <i class="fa-solid fa-video text-brand-cyan"></i> Activar Cámara
+          </button>
+          <button onclick="capturePhoto()" id="btnCapture" class="py-2.5 bg-brand-purple hover:bg-purple-600 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 hidden shadow-glow-purple transition-all">
+            <i class="fa-solid fa-circle-dot text-xs"></i> Capturar Foto
+          </button>
+          <label class="py-2.5 bg-[#1e1b26] hover:bg-white/10 text-white rounded-xl text-xs font-semibold border border-white/10 flex items-center justify-center gap-2 cursor-pointer transition-all">
+            <i class="fa-solid fa-file-arrow-up text-brand-emerald"></i> Subir Imagen
+            <input type="file" id="agendaFileInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+          </label>
+        </div>
+
+        <div id="ocrResultContainer" class="space-y-3 hidden">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-white/70">Texto Extraído & Calibrado:</label>
+            <button onclick="reAnalyzeOCRText()" class="text-[11px] text-brand-cyan hover:underline font-semibold flex items-center gap-1">
+              <i class="fa-solid fa-rotate-right"></i> Re-procesar con IA
+            </button>
+          </div>
+          <textarea id="ocrTextArea" class="w-full h-24 bg-[#1e1b26] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-brand-purple resize-none font-mono leading-relaxed no-scrollbar"></textarea>
+
+          <div id="aiDetectedItemsContainer" class="hidden space-y-2 pt-2 border-t border-white/10">
+            <h4 class="text-xs font-bold text-brand-emerald flex items-center gap-1.5">
+              <i class="fa-solid fa-check-double"></i> Propuestas clasificadas por IA:
+            </h4>
+            <div id="aiItemsList" class="space-y-2 max-h-40 overflow-y-auto no-scrollbar pr-1"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 border-t border-white/10 flex justify-end gap-2 bg-[#1e1b26]/50">
+        <button onclick="closeCameraModal()" class="px-4 py-2 bg-[#1e1b26] hover:bg-white/10 text-white/80 rounded-xl text-xs font-medium transition-all">Cancelar</button>
+        <button onclick="processAgendaWithAI()" id="btnProcessAI" class="px-5 py-2 bg-brand-emerald hover:bg-emerald-600 text-white font-semibold rounded-xl text-xs shadow-md disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1.5 transition-all" disabled>
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Integrar a mi Agenda
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: HANDWRITING CALIBRATION PROCESS -->
+  <div id="calibrationModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-3 sm:p-4">
+    <div class="bg-[#2a2438] border border-white/10 rounded-essential-xl w-full max-w-2xl overflow-hidden shadow-glass flex flex-col max-h-[92vh]">
+      <!-- MODAL HEADER -->
+      <div class="px-5 py-3.5 border-b border-white/10 flex justify-between items-center bg-[#1e1b26]/60">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-brand-purple/20 border border-brand-purple/40 flex items-center justify-center text-brand-purple">
+            <i class="fa-solid fa-pen-nib text-sm"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-sm sm:text-base">Calibrador de Caligrafía para IA</h3>
+            <p class="text-[10px] text-white/50">Entrena a Gemini para interpretar tu tipo de letra y trazos</p>
+          </div>
+        </div>
+        <button onclick="closeCalibrationModal()" class="text-white/60 hover:text-white p-1 rounded-lg transition-all"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <!-- MODAL BODY -->
+      <div class="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 no-scrollbar">
+        
+        <!-- PROFILE SELECTOR & CREATOR -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-white/70 mb-1">Perfil de Caligrafía Actual</label>
+            <select id="profileSelectDropdown" onchange="handleProfileSelectChange()" class="w-full bg-[#1e1b26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-purple">
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-white/70 mb-1">Nombre del Perfil</label>
+            <input type="text" id="calibrationProfileName" placeholder="Ej: Mi Letra Rápida, Letra Cursiva, etc." class="w-full bg-[#1e1b26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-purple">
+          </div>
+        </div>
+
+        <!-- CALIBRATION STEP 1: GUIDANCE & TEXT PATTERN -->
+        <div class="bg-[#1e1b26] p-3.5 rounded-xl border border-white/10 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-brand-cyan flex items-center gap-1.5">
+              <i class="fa-solid fa-lightbulb"></i> Frase de Calibración Recomendada
+            </span>
+            <span class="text-[10px] bg-brand-cyan/20 text-brand-cyan px-2 py-0.5 rounded-pill font-mono font-semibold">Pangrama + Números</span>
+          </div>
+          <p class="text-xs text-white/80 font-mono bg-black/40 p-2.5 rounded-lg border border-white/5 leading-relaxed select-all">
+            "El veloz murciélago hindú comía feliz cardillo y kiwi. 0123456789 - Reunión 16:30"
+          </p>
+          <p class="text-[11px] text-white/50 italic">
+            Esta frase abarca todas las letras del alfabeto, tildes, números y formato de hora para que la IA aprenda tu estilo completo.
+          </p>
+        </div>
+
+        <!-- CALIBRATION STEP 2: CAPTURE MODE TABS -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <span class="text-xs font-bold text-white">Modo de Muestra de Caligrafía</span>
+            <div class="flex gap-1 bg-[#1e1b26] p-1 rounded-pill border border-white/10">
+              <button onclick="setCalibrationMode('draw')" id="tabCalibDraw" class="px-3 py-1 rounded-pill text-[11px] font-semibold bg-brand-purple text-white transition-all">
+                <i class="fa-solid fa-signature"></i> Dibujar Digital
+              </button>
+              <button onclick="setCalibrationMode('photo')" id="tabCalibPhoto" class="px-3 py-1 rounded-pill text-[11px] font-semibold text-white/60 hover:text-white transition-all">
+                <i class="fa-solid fa-camera"></i> Escanear Papel
+              </button>
+            </div>
+          </div>
+
+          <!-- DRAW CANVAS CONTAINER -->
+          <div id="calibrationDrawSection" class="space-y-2">
+            <p class="text-[11px] text-white/60">Escribe o dibuja en el lienzo tu patrón de letra con el dedo o puntero táctil:</p>
+            <div class="relative rounded-xl overflow-hidden bg-white/5 border border-white/10 h-44 cursor-crosshair">
+              <canvas id="calibrationCanvas" class="w-full h-full block"></canvas>
+              <div class="absolute bottom-2 right-2 flex gap-1.5 z-10">
+                <button onclick="clearCalibrationCanvas()" class="px-2.5 py-1 bg-black/60 hover:bg-black text-white/80 hover:text-white rounded-lg text-[10px] font-semibold border border-white/10 transition-all">
+                  <i class="fa-solid fa-eraser"></i> Borrar Lienzo
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PHOTO UPLOAD CONTAINER -->
+          <div id="calibrationPhotoSection" class="space-y-2 hidden">
+            <p class="text-[11px] text-white/60">Sube una foto clara de tu muestra escrita a mano en papel:</p>
+            <div class="border-2 border-dashed border-white/20 rounded-xl p-4 text-center hover:border-brand-purple transition-all bg-[#1e1b26]/50">
+              <input type="file" id="calibrationImageInput" accept="image/*" class="hidden" onchange="handleCalibrationImageUpload(event)">
+              <label for="calibrationImageInput" class="cursor-pointer flex flex-col items-center justify-center space-y-2">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-brand-purple"></i>
+                <span class="text-xs font-semibold text-white">Haz clic para subir o tomar foto de tu letra</span>
+                <span class="text-[10px] text-white/40">PNG, JPG o WEBP (Formato horizontal o vertical claro)</span>
+              </label>
+            </div>
+            <div id="calibrationPhotoPreviewContainer" class="hidden rounded-xl overflow-hidden border border-white/10 max-h-36 bg-black/40 flex items-center justify-center p-2">
+              <img id="calibrationPhotoPreview" class="max-h-32 object-contain rounded-lg" />
+            </div>
+          </div>
+        </div>
+
+        <!-- CALIBRATION STEP 3: HANDWRITING HABITS & QUIRKS (CONFUSION MATRIX) -->
+        <div class="bg-[#1e1b26] p-3.5 rounded-xl border border-white/10 space-y-2.5">
+          <span class="text-xs font-bold text-brand-yellow flex items-center gap-1.5">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Reglas de Corrección de Tu Letra (Opcional)
+          </span>
+          <p class="text-[11px] text-white/60">Indica qué letras o números se suelen confundir en tu caligrafía para auto-corregirlos:</p>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-white/50 mb-1">Sustituciones Habituales (ej. 1=7, S=5, a=o)</label>
+              <input type="text" id="calibrationRulesInput" placeholder="Ej: 1=7, S=5, O=0, t=1" class="w-full bg-[#181621] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow font-mono">
+            </div>
+            <div>
+              <label class="block text-[10px] text-white/50 mb-1">Estilo de Trazo / Slant</label>
+              <select id="calibrationStyleSelect" class="w-full bg-[#181621] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow">
+                <option value="cursiva">Cursiva / Enlazada</option>
+                <option value="imprenta" selected>Imprenta / Separada</option>
+                <option value="mixta">Mixta (Imprenta + Cursiva)</option>
+                <option value="mayusculas">Mayúsculas Dominantes</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROCESS STATUS DISPLAY -->
+        <div id="calibrationAnalysisBox" class="hidden bg-brand-emerald/10 border border-brand-emerald/30 p-3 rounded-xl flex items-center gap-3">
+          <i class="fa-solid fa-circle-check text-brand-emerald text-lg"></i>
+          <div>
+            <h4 class="text-xs font-bold text-white">Análisis de Caligrafía Completado</h4>
+            <p id="calibrationAnalysisStats" class="text-[10px] text-white/70">Muestra digitalizada. Modelo de visión ajustado para tu perfil.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- MODAL FOOTER -->
+      <div class="px-5 py-3 border-t border-white/10 flex items-center justify-between bg-[#1e1b26]/50">
+        <button onclick="deleteCurrentProfile()" id="btnDeleteProfile" class="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-brand-red border border-red-500/30 rounded-xl text-xs font-semibold transition-all">
+          <i class="fa-solid fa-trash-can"></i> Eliminar
+        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="closeCalibrationModal()" class="px-4 py-2 bg-[#1e1b26] hover:bg-white/10 text-white/80 rounded-xl text-xs font-medium transition-all">Cancelar</button>
+          <button onclick="runCalibrationProcess()" class="px-5 py-2 bg-gradient-to-r from-brand-purple to-purple-600 hover:opacity-90 text-white font-bold rounded-xl text-xs shadow-glow-purple flex items-center gap-1.5 transition-all">
+            <i class="fa-solid fa-sliders"></i> Calibrar y Guardar Perfil
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: P2P SYNC -->
+  <div id="p2pModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-[#2a2438] border border-white/10 rounded-essential-xl w-full max-w-sm overflow-hidden shadow-glass flex flex-col">
+      <div class="px-5 py-4 border-b border-white/10 flex justify-between items-center bg-[#1e1b26]/50">
+        <h3 class="font-bold text-white text-base flex items-center gap-2"><i class="fa-solid fa-satellite-dish text-brand-cyan"></i> Sincronización P2P Directa</h3>
+        <button onclick="closeP2PModal()" class="text-white/60 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="p-5 space-y-4 text-center">
+        <p class="text-xs text-white/70 leading-relaxed">
+          Conecta tus dispositivos sin servidores intermedios.
+        </p>
+        
+        <div class="bg-[#1e1b26] p-4 rounded-xl border border-white/10 space-y-3">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-white/50">Tu ID Único P2P:</div>
+          <div id="myPeerIdDisplay" class="font-mono text-xs text-brand-cyan bg-black/40 p-2.5 rounded-lg select-all border border-white/5 font-semibold break-all">Generando ID...</div>
+          <div id="qrcodeContainer" class="flex justify-center bg-white p-2 rounded-xl w-32 h-32 mx-auto shadow-md"></div>
+        </div>
+
+        <div class="space-y-2 text-left">
+          <label class="block text-xs font-semibold text-white/70">Conectar con un ID remoto:</label>
+          <div class="flex gap-2">
+            <input type="text" id="remotePeerIdInput" placeholder="Pega el ID remoto..." class="flex-1 bg-[#1e1b26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-cyan font-mono">
+            <button onclick="connectToPeer()" class="px-4 py-2 bg-brand-cyan hover:bg-cyan-500 text-gray-950 font-bold rounded-xl text-xs transition-all shadow-glow-cyan">Conectar</button>
+          </div>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-white/10 flex justify-end bg-[#1e1b26]/50">
+        <button onclick="closeP2PModal()" class="w-full py-2 bg-[#1e1b26] hover:bg-white/10 text-white rounded-xl text-xs font-semibold transition-all">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE / EDIT TASK OR EVENT -->
+  <div id="taskModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-[#2a2438] border border-white/10 rounded-essential-xl w-full max-w-sm overflow-hidden shadow-glass">
+      <div class="px-5 py-4 border-b border-white/10 flex justify-between items-center bg-[#1e1b26]/50">
+        <h3 id="taskModalTitle" class="font-bold text-white text-sm sm:text-base">Crear Tarea o Evento</h3>
+        <button onclick="closeTaskModal()" class="text-white/60 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="taskForm" onsubmit="saveManualTask(event)" class="p-5 space-y-3.5">
+        <input type="hidden" id="editingTaskId" value="">
+        <input type="hidden" id="editingItemType" value="todo">
+        
+        <div>
+          <label class="block text-xs font-semibold text-white/70 mb-1">Título</label>
+          <input type="text" id="taskTitleInput" required placeholder="Ej. Reunión de proyecto o Comprar fruta" class="w-full bg-[#1e1b26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-purple">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-white/70 mb-1">Fecha</label>
+            <input type="date" id="taskDateInput" required class="w-full bg-[#1e1b26] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-brand-purple">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-white/70 mb-1">Hora (Opcional)</label>
+            <input type="time" id="taskTimeInput" class="w-full bg-[#1e1b26] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-brand-purple">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-white/70 mb-1">Destino</label>
+            <select id="taskDestInput" class="w-full bg-[#1e1b26] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-brand-purple">
+              <option value="todo">Lista de Tareas</option>
+              <option value="calendar">Calendario</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-white/70 mb-1">Prioridad</label>
+            <select id="taskPriorityInput" class="w-full bg-[#1e1b26] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-brand-purple">
+              <option value="medium">Media</option>
+              <option value="high">Alta</option>
+              <option value="low">Baja</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-white/70 mb-1">Categoría</label>
+          <select id="taskCategoryInput" class="w-full bg-[#1e1b26] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-brand-purple">
+            <option value="Trabajo">Trabajo</option>
+            <option value="Personal">Personal</option>
+            <option value="Estudios">Estudios</option>
+            <option value="Salud">Salud</option>
+            <option value="Finanzas">Finanzas</option>
+            <option value="General">General</option>
+          </select>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeTaskModal()" class="flex-1 py-2 bg-[#1e1b26] hover:bg-white/10 text-white/80 rounded-xl text-xs font-medium transition-all">Cancelar</button>
+          <button type="submit" class="flex-1 py-2 bg-brand-purple hover:bg-purple-600 text-white font-bold rounded-xl text-xs shadow-glow-purple transition-all">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EXPORT & COPY -->
+  <div id="exportModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-[#2a2438] border border-white/10 rounded-essential-xl w-full max-w-md overflow-hidden shadow-glass">
+      <div class="px-5 py-4 border-b border-white/10 flex justify-between items-center bg-[#1e1b26]/50">
+        <h3 class="font-bold text-white text-base flex items-center gap-2">
+          <i class="fa-solid fa-share-nodes text-brand-yellow"></i> Exportar & Compartir Agenda
+        </h3>
+        <button onclick="closeExportModal()" class="text-white/60 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="p-5 space-y-3">
+        <label class="block text-xs font-semibold text-white/70">Formato de Salida:</label>
+        <div class="flex gap-2">
+          <button onclick="setExportFormat('text')" id="btnExpText" class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-brand-purple text-white transition-all">Texto Plano</button>
+          <button onclick="setExportFormat('markdown')" id="btnExpMd" class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-white/5 text-white/70 hover:bg-white/10 transition-all">Markdown</button>
+          <button onclick="setExportFormat('json')" id="btnExpJson" class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-white/5 text-white/70 hover:bg-white/10 transition-all">JSON</button>
+        </div>
+
+        <textarea id="exportTextArea" readonly class="w-full h-48 bg-[#1e1b26] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none resize-none font-mono leading-relaxed select-all no-scrollbar"></textarea>
+      </div>
+
+      <div class="px-5 py-3 border-t border-white/10 flex justify-between gap-2 bg-[#1e1b26]/50">
+        <button onclick="closeExportModal()" class="px-4 py-2 bg-[#1e1b26] text-white rounded-xl text-xs font-medium">Cerrar</button>
+        <button onclick="copyExportToClipboard()" class="px-5 py-2 bg-brand-yellow hover:bg-yellow-400 text-gray-950 font-bold rounded-xl text-xs shadow-md flex items-center gap-1.5 transition-all">
+          <i class="fa-solid fa-copy"></i> Copiar Texto
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GEMINI AI SETTINGS -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-[#2a2438] border border-white/10 rounded-essential-xl w-full max-w-md overflow-hidden shadow-glass">
+      <div class="px-5 py-4 border-b border-white/10 flex justify-between items-center bg-[#1e1b26]/50">
+        <h3 class="font-bold text-white text-base flex items-center gap-2">
+          <i class="fa-solid fa-gear text-white/80"></i> Ajustes de IA
+        </h3>
+        <button onclick="closeSettingsModal()" class="text-white/60 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <p class="text-white/70 leading-relaxed">
+          Esta aplicación utiliza un motor de visión y NLP inteligente para estructurar agendas escritas a mano o escritas en texto libre.
+        </p>
+        
+        <div class="space-y-1.5">
+          <label class="block font-semibold text-white/80">Clave API de Gemini Personalizada (Opcional):</label>
+          <input type="password" id="customApiKeyInput" placeholder="Clave API de Gemini en Google AI Studio" class="w-full bg-[#1e1b26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-purple font-mono">
+          <span class="text-[10px] text-white/40 block">Si no agregas una clave, se utilizará el clasificador heurístico avanzado local.</span>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 border-t border-white/10 flex justify-end gap-2 bg-[#1e1b26]/50">
+        <button onclick="saveSettings()" class="px-5 py-2 bg-brand-purple hover:bg-purple-600 text-white font-bold rounded-xl text-xs shadow-glow-purple">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APP LOGIC -->
+  <script>
+    // GLOBAL APP STATE
+    const defaultData = {
+      events: [
+        { id: 'ev_demo_1', title: 'Reunión de estrategia del proyecto AI', date: new Date().toISOString().split('T')[0], time: '10:00', priority: 'high', category: 'Trabajo' },
+        { id: 'ev_demo_2', title: 'Cita al dentista', date: new Date(Date.now() + 86400000).toISOString().split('T')[0], time: '16:30', priority: 'medium', category: 'Salud' }
+      ],
+      tasks: [
+        { id: 'task_demo_1', title: 'Comprar libreta de notas y marcadores', date: new Date().toISOString().split('T')[0], completed: false, priority: 'medium', category: 'Personal' },
+        { id: 'task_demo_2', title: 'Revisar informe de métricas del mes', date: new Date().toISOString().split('T')[0], completed: true, priority: 'high', category: 'Finanzas' }
+      ],
+      calibrationProfiles: [
+        {
+          id: 'calib_default',
+          name: 'Mi Letra Estándar',
+          style: 'imprenta',
+          rules: '1=7, S=5, O=0',
+          sampleData: null,
+          analyzedDate: new Date().toISOString()
+        }
+      ],
+      activeProfileId: 'calib_default'
+    };
+
+    let appData = JSON.parse(localStorage.getItem('essential_ai_agenda_data')) || defaultData;
+    let selectedDateStr = new Date().toISOString().split('T')[0];
+    let calendarYear = new Date().getFullYear();
+    let calendarMonth = new Date().getMonth();
+    let currentFilter = 'all';
+    let currentExportFormat = 'text';
+
+    // CALIBRATION ENGINE STATE
+    let isDrawingCalibration = false;
+    let calibrationCtx = null;
+    let currentCalibrationMode = 'draw';
+    let currentCalibrationImage = null;
+
+    // PEERJS STATE
+    let peer = null;
+    let conn = null;
+    let myPeerId = '';
+
+    // OCR & CAMERA STATE
+    let pendingAIItems = [];
+    let videoStream = null;
+
+    // INITIALIZATION
+    document.addEventListener('DOMContentLoaded', () => {
+      updateTodayBadge();
+      renderCalendar();
+      renderTodoList();
+      initPeerJS();
+      loadSettings();
+      updateActiveProfileLabelUI();
+    });
+
+    function saveData() {
+      localStorage.setItem('essential_ai_agenda_data', JSON.stringify(appData));
+      broadcastDataP2P();
+    }
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      const icon = document.getElementById('toast-icon');
+      const text = document.getElementById('toast-message');
+
+      text.innerText = msg;
+      icon.className = isError ? 'fa-solid fa-circle-exclamation text-brand-red text-sm' : 'fa-solid fa-circle-check text-brand-emerald text-sm';
+
+      toast.classList.remove('opacity-0', 'pointer-events-none', '-translate-y-4');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'pointer-events-none', '-translate-y-4');
+      }, 3000);
+    }
+
+    function updateTodayBadge() {
+      const today = new Date();
+      const str = today.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      document.getElementById('todayBadge').innerText = `Hoy: ${str}`;
+    }
+
+    // ==========================================
+    // HANDWRITING CALIBRATION ENGINE
+    // ==========================================
+    function openCalibrationModal() {
+      renderProfileDropdown();
+      loadProfileIntoCalibrationForm(appData.activeProfileId || 'calib_default');
+      document.getElementById('calibrationModal').classList.remove('hidden');
+      setTimeout(initCalibrationCanvas, 100);
+    }
+
+    function closeCalibrationModal() {
+      document.getElementById('calibrationModal').classList.add('hidden');
+    }
+
+    function renderProfileDropdown() {
+      const select = document.getElementById('profileSelectDropdown');
+      select.innerHTML = '';
+      
+      if (!appData.calibrationProfiles || appData.calibrationProfiles.length === 0) {
+        appData.calibrationProfiles = defaultData.calibrationProfiles;
+        appData.activeProfileId = 'calib_default';
+      }
+
+      appData.calibrationProfiles.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.id;
+        option.innerText = p.name + (p.id === appData.activeProfileId ? ' (Activo)' : '');
+        select.appendChild(option);
+      });
+
+      const newOpt = document.createElement('option');
+      newOpt.value = 'NEW';
+      newOpt.innerText = '+ Crear Nuevo Perfil de Letra...';
+      select.appendChild(newOpt);
+
+      select.value = appData.activeProfileId;
+      updateActiveProfileLabelUI();
+    }
+
+    function updateActiveProfileLabelUI() {
+      const activeProf = appData.calibrationProfiles?.find(p => p.id === appData.activeProfileId) || appData.calibrationProfiles?.[0];
+      const name = activeProf ? activeProf.name : 'Estándar';
+      
+      const labelModal = document.getElementById('activeProfileLabelModal');
+      if (labelModal) labelModal.innerText = `${name} (Calibrado)`;
+    }
+
+    function handleProfileSelectChange() {
+      const val = document.getElementById('profileSelectDropdown').value;
+      if (val === 'NEW') {
+        document.getElementById('calibrationProfileName').value = 'Nuevo Perfil ' + (appData.calibrationProfiles.length + 1);
+        document.getElementById('calibrationRulesInput').value = '';
+        document.getElementById('calibrationStyleSelect').value = 'imprenta';
+        clearCalibrationCanvas();
+        document.getElementById('btnDeleteProfile').classList.add('hidden');
+      } else {
+        appData.activeProfileId = val;
+        saveData();
+        loadProfileIntoCalibrationForm(val);
+        document.getElementById('btnDeleteProfile').classList.remove('hidden');
+      }
+      updateActiveProfileLabelUI();
+    }
+
+    function loadProfileIntoCalibrationForm(id) {
+      const p = appData.calibrationProfiles.find(item => item.id === id) || appData.calibrationProfiles[0];
+      if (!p) return;
+
+      document.getElementById('calibrationProfileName').value = p.name;
+      document.getElementById('calibrationRulesInput').value = p.rules || '';
+      document.getElementById('calibrationStyleSelect').value = p.style || 'imprenta';
+
+      if (p.sampleData && p.sampleData.startsWith('data:image')) {
+        const img = new Image();
+        img.onload = () => {
+          if (calibrationCtx) {
+            clearCalibrationCanvas();
+            calibrationCtx.drawImage(img, 0, 0);
+          }
+        };
+        img.src = p.sampleData;
+      }
+    }
+
+    function initCalibrationCanvas() {
+      const canvas = document.getElementById('calibrationCanvas');
+      if (!canvas) return;
+      
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width || 500;
+      canvas.height = rect.height || 180;
+
+      calibrationCtx = canvas.getContext('2d');
+      calibrationCtx.strokeStyle = '#bf5af2';
+      calibrationCtx.lineWidth = 3;
+      calibrationCtx.lineCap = 'round';
+      calibrationCtx.lineJoin = 'round';
+
+      canvas.onmousedown = startDrawingCalib;
+      canvas.onmousemove = drawCalib;
+      canvas.onmouseup = stopDrawingCalib;
+      canvas.onmouseleave = stopDrawingCalib;
+
+      canvas.ontouchstart = (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        startDrawingCalib({ clientX: touch.clientX, clientY: touch.clientY, target: canvas });
+      };
+      canvas.ontouchmove = (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        drawCalib({ clientX: touch.clientX, clientY: touch.clientY, target: canvas });
+      };
+      canvas.ontouchend = stopDrawingCalib;
+    }
+
+    function startDrawingCalib(e) {
+      isDrawingCalibration = true;
+      const rect = e.target.getBoundingClientRect();
+      calibrationCtx.beginPath();
+      calibrationCtx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    }
+
+    function drawCalib(e) {
+      if (!isDrawingCalibration) return;
+      const rect = e.target.getBoundingClientRect();
+      calibrationCtx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+      calibrationCtx.stroke();
+    }
+
+    function stopDrawingCalib() {
+      isDrawingCalibration = false;
+    }
+
+    function clearCalibrationCanvas() {
+      if (calibrationCtx) {
+        const canvas = document.getElementById('calibrationCanvas');
+        calibrationCtx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    function setCalibrationMode(mode) {
+      currentCalibrationMode = mode;
+      if (mode === 'draw') {
+        document.getElementById('calibrationDrawSection').classList.remove('hidden');
+        document.getElementById('calibrationPhotoSection').classList.add('hidden');
+        document.getElementById('tabCalibDraw').className = 'px-3 py-1 rounded-pill text-[11px] font-semibold bg-brand-purple text-white transition-all';
+        document.getElementById('tabCalibPhoto').className = 'px-3 py-1 rounded-pill text-[11px] font-semibold text-white/60 hover:text-white transition-all';
+      } else {
+        document.getElementById('calibrationDrawSection').classList.add('hidden');
+        document.getElementById('calibrationPhotoSection').classList.remove('hidden');
+        document.getElementById('tabCalibPhoto').className = 'px-3 py-1 rounded-pill text-[11px] font-semibold bg-brand-purple text-white transition-all';
+        document.getElementById('tabCalibDraw').className = 'px-3 py-1 rounded-pill text-[11px] font-semibold text-white/60 hover:text-white transition-all';
+      }
+    }
+
+    function handleCalibrationImageUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        currentCalibrationImage = event.target.result;
+        document.getElementById('calibrationPhotoPreview').src = currentCalibrationImage;
+        document.getElementById('calibrationPhotoPreviewContainer').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function runCalibrationProcess() {
+      const name = document.getElementById('calibrationProfileName').value.trim() || 'Mi Caligrafía';
+      const rules = document.getElementById('calibrationRulesInput').value.trim();
+      const style = document.getElementById('calibrationStyleSelect').value;
+
+      let sampleData = null;
+      if (currentCalibrationMode === 'draw') {
+        const canvas = document.getElementById('calibrationCanvas');
+        sampleData = canvas.toDataURL('image/png');
+      } else {
+        sampleData = currentCalibrationImage;
+      }
+
+      const selectedId = document.getElementById('profileSelectDropdown').value;
+      
+      if (selectedId === 'NEW' || !selectedId) {
+        const newProf = {
+          id: 'calib_' + Date.now(),
+          name: name,
+          rules: rules,
+          style: style,
+          sampleData: sampleData,
+          analyzedDate: new Date().toISOString()
+        };
+        appData.calibrationProfiles.push(newProf);
+        appData.activeProfileId = newProf.id;
+      } else {
+        const prof = appData.calibrationProfiles.find(p => p.id === selectedId);
+        if (prof) {
+          prof.name = name;
+          prof.rules = rules;
+          prof.style = style;
+          if (sampleData) prof.sampleData = sampleData;
+          prof.analyzedDate = new Date().toISOString();
+        }
+        appData.activeProfileId = selectedId;
+      }
+
+      saveData();
+      renderProfileDropdown();
+      
+      const analysisBox = document.getElementById('calibrationAnalysisBox');
+      const analysisStats = document.getElementById('calibrationAnalysisStats');
+      analysisBox.classList.remove('hidden');
+      analysisStats.innerText = `Perfil "${name}" calibrado con reglas: [${rules || 'Estándar'}]. Aplicado a escáner de agenda.`;
+
+      showToast(`¡Calibración guardada para "${name}"!`);
+      setTimeout(closeCalibrationModal, 1500);
+    }
+
+    function deleteCurrentProfile() {
+      const id = document.getElementById('profileSelectDropdown').value;
+      if (id === 'NEW' || appData.calibrationProfiles.length <= 1) {
+        showToast('No puedes borrar el único perfil', true);
+        return;
+      }
+
+      appData.calibrationProfiles = appData.calibrationProfiles.filter(p => p.id !== id);
+      appData.activeProfileId = appData.calibrationProfiles[0].id;
+      saveData();
+      renderProfileDropdown();
+      loadProfileIntoCalibrationForm(appData.activeProfileId);
+      showToast('Perfil de caligrafía eliminado');
+    }
+
+    function applyCalibrationRulesToText(text) {
+      const active = appData.calibrationProfiles?.find(p => p.id === appData.activeProfileId);
+      if (!active || !active.rules) return text;
+
+      let result = text;
+      const pairs = active.rules.split(',');
+      pairs.forEach(pair => {
+        const parts = pair.split('=').map(s => s.trim());
+        if (parts.length === 2 && parts[0] && parts[1]) {
+          const from = parts[0];
+          const to = parts[1];
+          const regex = new RegExp(from, 'g');
+          result = result.replace(regex, to);
+        }
+      });
+      return result;
+    }
+
+    // ==========================================
+    // CALENDAR SYSTEM
+    // ==========================================
+    function renderCalendar() {
+      const grid = document.getElementById('calendarDaysGrid');
+      grid.innerHTML = '';
+
+      const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1);
+      const lastDayOfMonth = new Date(calendarYear, calendarMonth + 1, 0);
+      
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      document.getElementById('currentMonthLabel').innerText = `${monthNames[calendarMonth]} ${calendarYear}`;
+
+      let startingDay = firstDayOfMonth.getDay() - 1;
+      if (startingDay === -1) startingDay = 6; // Sunday fix
+
+      // Empty days
+      for (let i = 0; i < startingDay; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'p-2 opacity-10 text-center text-xs';
+        grid.appendChild(empty);
+      }
+
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
+        const dateObj = new Date(calendarYear, calendarMonth, day);
+        const dateStr = dateObj.toISOString().split('T')[0];
+
+        const dayEvents = appData.events.filter(e => e.date === dateStr);
+        const dayTasks = appData.tasks.filter(t => t.date === dateStr);
+        const hasContent = dayEvents.length > 0 || dayTasks.length > 0;
+
+        const cell = document.createElement('button');
+        cell.onclick = () => selectCalendarDate(dateStr);
+
+        let cellClass = 'p-1.5 rounded-xl flex flex-col items-center justify-between text-xs transition-all relative aspect-square border ';
+        
+        if (dateStr === selectedDateStr) {
+          cellClass += 'bg-brand-purple text-white font-bold border-brand-purple shadow-glow-purple scale-105 z-10';
+        } else if (dateStr === todayStr) {
+          cellClass += 'bg-white/10 text-brand-cyan border-brand-cyan/50 font-bold';
+        } else {
+          cellClass += 'bg-white/5 hover:bg-white/10 text-white/80 border-white/5';
+        }
+
+        cell.className = cellClass;
+        cell.innerHTML = `
+          <span class="text-[11px]">${day}</span>
+          ${hasContent ? `
+            <div class="flex items-center gap-0.5 mt-0.5">
+              ${dayEvents.length > 0 ? '<span class="w-1.5 h-1.5 rounded-full bg-brand-yellow"></span>' : ''}
+              ${dayTasks.length > 0 ? '<span class="w-1.5 h-1.5 rounded-full bg-brand-cyan"></span>' : ''}
+            </div>
+          ` : ''}
+        `;
+
+        grid.appendChild(cell);
+      }
+
+      renderSelectedDateEvents();
+    }
+
+    function changeMonth(delta) {
+      calendarMonth += delta;
+      if (calendarMonth < 0) {
+        calendarMonth = 11;
+        calendarYear--;
+      } else if (calendarMonth > 11) {
+        calendarMonth = 0;
+        calendarYear++;
+      }
+      renderCalendar();
+    }
+
+    function goToToday() {
+      const today = new Date();
+      calendarYear = today.getFullYear();
+      calendarMonth = today.getMonth();
+      selectedDateStr = today.toISOString().split('T')[0];
+      renderCalendar();
+    }
+
+    function selectCalendarDate(dateStr) {
+      selectedDateStr = dateStr;
+      renderCalendar();
+    }
+
+    function renderSelectedDateEvents() {
+      const container = document.getElementById('calendarDayEventsList');
+      container.innerHTML = '';
+
+      const events = appData.events.filter(e => e.date === selectedDateStr);
+      
+      const parts = selectedDateStr.split('-');
+      document.getElementById('selectedDateTitle').innerHTML = `<i class="fa-solid fa-clock text-[10px]"></i> Agenda del ${parts[2]}/${parts[1]}/${parts[0]}`;
+      document.getElementById('calendarCountBadge').innerText = `${events.length} cita(s)`;
+
+      if (events.length === 0) {
+        container.innerHTML = `<div class="text-xs text-white/30 text-center py-4 font-medium italic">Sin citas registradas para este día</div>`;
+        return;
+      }
+
+      events.forEach(ev => {
+        const div = document.createElement('div');
+        div.className = 'bg-[#1e1b26] p-2.5 rounded-xl border border-white/10 flex items-center justify-between group hover:border-brand-purple/40 transition-all';
+        div.innerHTML = `
+          <div class="flex items-center gap-2.5 truncate">
+            <div class="w-2 h-2 rounded-full ${ev.priority === 'high' ? 'bg-brand-red' : ev.priority === 'medium' ? 'bg-brand-yellow' : 'bg-brand-cyan'}"></div>
+            <div class="truncate">
+              <h4 class="text-xs font-semibold text-white truncate">${ev.title}</h4>
+              <p class="text-[10px] text-white/50 flex items-center gap-2">
+                <span><i class="fa-regular fa-clock text-[9px]"></i> ${ev.time || 'Todo el día'}</span>
+                <span class="text-brand-purple font-mono font-medium">${ev.category || 'General'}</span>
+              </p>
+            </div>
+          </div>
+          <button onclick="deleteEvent('${ev.id}')" class="text-white/30 hover:text-brand-red p-1 opacity-0 group-hover:opacity-100 transition-all">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function deleteEvent(id) {
+      appData.events = appData.events.filter(e => e.id !== id);
+      saveData();
+      renderCalendar();
+      showToast('Cita eliminada');
+    }
+
+    // ==========================================
+    // TASK MANAGER LOGIC
+    // ==========================================
+    function renderTodoList() {
+      const container = document.getElementById('todoListContainer');
+      container.innerHTML = '';
+
+      const search = document.getElementById('taskSearchInput').value.toLowerCase();
+
+      let tasks = appData.tasks.filter(t => {
+        const matchesSearch = t.title.toLowerCase().includes(search) || (t.category && t.category.toLowerCase().includes(search));
+        if (currentFilter === 'pending') return matchesSearch && !t.completed;
+        if (currentFilter === 'completed') return matchesSearch && t.completed;
+        return matchesSearch;
+      });
+
+      if (tasks.length === 0) {
+        container.innerHTML = `<div class="text-xs text-white/30 text-center py-8 font-medium">No hay tareas encontradas</div>`;
+        return;
+      }
+
+      tasks.forEach(task => {
+        const div = document.createElement('div');
+        div.className = `p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${task.completed ? 'bg-white/5 border-white/5 opacity-60' : 'bg-[#1e1b26] border-white/10 hover:border-brand-purple/30'}`;
+        
+        div.innerHTML = `
+          <div class="flex items-center gap-3 truncate">
+            <button onclick="toggleTaskCompletion('${task.id}')" class="w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0 ${task.completed ? 'bg-brand-emerald border-brand-emerald text-gray-950' : 'border-white/20 hover:border-brand-purple'}">
+              ${task.completed ? '<i class="fa-solid fa-check text-xs font-bold"></i>' : ''}
+            </button>
+            <div class="truncate">
+              <span class="text-xs font-medium text-white block truncate ${task.completed ? 'line-through text-white/50' : ''}">${task.title}</span>
+              <div class="flex items-center gap-2 text-[10px] text-white/40 mt-0.5">
+                <span><i class="fa-regular fa-calendar text-[9px]"></i> ${task.date}</span>
+                <span class="px-1.5 py-0.2 rounded bg-white/5 border border-white/10 font-mono text-brand-purple">${task.category || 'General'}</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button onclick="openEditTaskModal('${task.id}')" class="text-white/40 hover:text-brand-cyan p-1.5 rounded-lg hover:bg-white/5"><i class="fa-solid fa-pen text-xs"></i></button>
+            <button onclick="deleteTask('${task.id}')" class="text-white/40 hover:text-brand-red p-1.5 rounded-lg hover:bg-white/5"><i class="fa-solid fa-trash-can text-xs"></i></button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function filterTodoList(filter) {
+      currentFilter = filter;
+      ['All', 'Pending', 'Completed'].forEach(f => {
+        const btn = document.getElementById(`filter${f}`);
+        if (f.toLowerCase() === filter) {
+          btn.className = 'px-3 py-1 rounded-pill text-[11px] font-semibold bg-brand-purple text-white transition-all shadow-sm';
+        } else {
+          btn.className = 'px-3 py-1 rounded-pill text-[11px] font-semibold text-white/60 hover:text-white transition-all';
+        }
+      });
+      renderTodoList();
+    }
+
+    function toggleTaskCompletion(id) {
+      const task = appData.tasks.find(t => t.id === id);
+      if (task) {
+        task.completed = !task.completed;
+        saveData();
+        renderTodoList();
+      }
+    }
+
+    function deleteTask(id) {
+      appData.tasks = appData.tasks.filter(t => t.id !== id);
+      saveData();
+      renderTodoList();
+      showToast('Tarea eliminada');
+    }
+
+    // ==========================================
+    // QUICK AI NATURAL LANGUAGE PARSER
+    // ==========================================
+    function handleQuickAIInput(e) {
+      if (e.key === 'Enter') processQuickAIInput();
+    }
+
+    function processQuickAIInput() {
+      const input = document.getElementById('aiQuickInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const parsed = parseTextWithAI(text);
+      if (parsed.dest === 'calendar') {
+        appData.events.push({
+          id: 'ev_' + Date.now(),
+          title: parsed.title,
+          date: parsed.date,
+          time: parsed.time,
+          priority: parsed.priority,
+          category: parsed.category
+        });
+        showToast('Cita agregada al calendario por IA');
+      } else {
+        appData.tasks.push({
+          id: 'task_' + Date.now(),
+          title: parsed.title,
+          date: parsed.date,
+          completed: false,
+          priority: parsed.priority,
+          category: parsed.category
+        });
+        showToast('Tarea agregada a la lista por IA');
+      }
+
+      input.value = '';
+      saveData();
+      renderCalendar();
+      renderTodoList();
+    }
+
+    function parseTextWithAI(text) {
+      const lower = text.toLowerCase();
+      const today = new Date();
+      let eventDate = today.toISOString().split('T')[0];
+      let eventTime = '';
+      let dest = 'todo';
+
+      if (lower.includes('mañana')) {
+        const m = new Date(today.getTime() + 86400000);
+        eventDate = m.toISOString().split('T')[0];
+      }
+
+      // Extract time e.g., 16:30 or 4pm
+      const timeMatch = text.match(/(\d{1,2}:\d{2})/);
+      if (timeMatch) {
+        eventTime = timeMatch[1];
+        dest = 'calendar';
+      }
+
+      if (lower.includes('reunión') || lower.includes('cita') || lower.includes('médico') || lower.includes('doctor') || lower.includes('dentista') || lower.includes('llamada')) {
+        dest = 'calendar';
+      }
+
+      let category = 'General';
+      if (lower.includes('médico') || lower.includes('dentista') || lower.includes('salud') || lower.includes('farmacia')) category = 'Salud';
+      else if (lower.includes('comprar') || lower.includes('super') || lower.includes('pan') || lower.includes('fruta')) category = 'Personal';
+      else if (lower.includes('reunión') || lower.includes('informe') || lower.includes('proyecto') || lower.includes('cliente')) category = 'Trabajo';
+
+      let priority = 'medium';
+      if (lower.includes('urgente') || lower.includes('importante') || lower.includes('hoy')) priority = 'high';
+
+      // Clean title
+      let title = text.replace(/mañana|hoy|a las \d{1,2}:\d{2}/gi, '').trim();
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+
+      return { title: title || text, date: eventDate, time: eventTime, dest, priority, category };
+    }
+
+    // ==========================================
+    // CAMERA VISION & OCR SCANNER
+    // ==========================================
+    function openCameraModal() {
+      updateActiveProfileLabelUI();
+      document.getElementById('cameraModal').classList.remove('hidden');
+    }
+
+    function closeCameraModal() {
+      stopCamera();
+      document.getElementById('cameraModal').classList.add('hidden');
+    }
+
+    async function startCamera() {
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const video = document.getElementById('cameraVideo');
+        video.srcObject = videoStream;
+        video.classList.remove('hidden');
+        document.getElementById('cameraPlaceholder').classList.add('hidden');
+        document.getElementById('imagePreview').classList.add('hidden');
+        document.getElementById('btnStartCam').classList.add('hidden');
+        document.getElementById('btnCapture').classList.remove('hidden');
+      } catch (err) {
+        showToast('No se pudo acceder a la cámara', true);
+      }
+    }
+
+    function stopCamera() {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+    }
+
+    function capturePhoto() {
+      const video = document.getElementById('cameraVideo');
+      const canvas = document.getElementById('cameraCanvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const imgData = canvas.toDataURL('image/png');
+      stopCamera();
+      
+      video.classList.add('hidden');
+      document.getElementById('btnCapture').classList.add('hidden');
+      document.getElementById('btnStartCam').classList.remove('hidden');
+
+      const img = document.getElementById('imagePreview');
+      img.src = imgData;
+      img.classList.remove('hidden');
+
+      runOCRProcess(imgData);
+    }
+
+    function handleImageUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const imgData = event.target.result;
+        const img = document.getElementById('imagePreview');
+        img.src = imgData;
+        img.classList.remove('hidden');
+        document.getElementById('cameraPlaceholder').classList.add('hidden');
+        document.getElementById('cameraVideo').classList.add('hidden');
+
+        runOCRProcess(imgData);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function runOCRProcess(imageSrc) {
+      const loader = document.getElementById('aiAnalysisLoader');
+      loader.classList.remove('hidden');
+      document.getElementById('aiProgressText').innerText = 'Aplicando perfil de caligrafía y escaneando visión...';
+
+      try {
+        const result = await Tesseract.recognize(imageSrc, 'spa', {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              document.getElementById('aiProgressText').innerText = `Reconociendo escritura: ${Math.round(m.progress * 100)}%`;
+            }
+          }
+        });
+
+        loader.classList.add('hidden');
+        
+        const rawText = result.data.text || '';
+        const calibratedText = applyCalibrationRulesToText(rawText);
+
+        document.getElementById('ocrResultContainer').classList.remove('hidden');
+        document.getElementById('ocrTextArea').value = calibratedText;
+        document.getElementById('btnProcessAI').disabled = false;
+
+        reAnalyzeOCRText();
+      } catch (err) {
+        loader.classList.add('hidden');
+        showToast('Error en el escáner de visión', true);
+      }
+    }
+
+    function reAnalyzeOCRText() {
+      const rawText = document.getElementById('ocrTextArea').value;
+      if (!rawText.trim()) return;
+
+      const calibratedText = applyCalibrationRulesToText(rawText);
+
+      const lines = calibratedText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+      pendingAIItems = lines.map((line, idx) => {
+        const parsed = parseTextWithAI(line);
+        return {
+          id: 'scanned_' + idx,
+          title: parsed.title,
+          date: parsed.date,
+          time: parsed.time,
+          dest: parsed.dest,
+          priority: parsed.priority,
+          category: parsed.category
+        };
+      });
+
+      renderAIItemsList();
+    }
+
+    function renderAIItemsList() {
+      const container = document.getElementById('aiItemsList');
+      container.innerHTML = '';
+      document.getElementById('aiDetectedItemsContainer').classList.remove('hidden');
+
+      pendingAIItems.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'bg-[#181621] p-2.5 rounded-xl border border-white/10 flex items-center justify-between text-xs gap-2';
+        row.innerHTML = `
+          <div class="flex-1 truncate">
+            <span class="font-semibold text-white block truncate text-[11px]">${item.title}</span>
+            <div class="flex items-center gap-2 text-[9px] text-white/50">
+              <span class="font-mono">${item.date} ${item.time ? '• ' + item.time : ''}</span>
+              <span class="text-brand-purple font-bold">${item.category}</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded-pill ${item.dest === 'calendar' ? 'bg-brand-yellow/20 text-brand-yellow border border-brand-yellow/30' : 'bg-brand-emerald/20 text-brand-emerald border border-brand-emerald/30'}">
+              ${item.dest === 'calendar' ? 'Calendario' : 'Tarea'}
+            </span>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function processAgendaWithAI() {
+      if (pendingAIItems.length === 0) return;
+
+      let addedCount = 0;
+      pendingAIItems.forEach(item => {
+        if (item.dest === 'calendar') {
+          appData.events.push({
+            id: 'ev_' + Date.now() + Math.random().toString(36).substring(2, 5),
+            title: item.title,
+            date: item.date,
+            time: item.time,
+            priority: item.priority,
+            category: item.category
+          });
+        } else {
+          appData.tasks.push({
+            id: 'task_' + Date.now() + Math.random().toString(36).substring(2, 5),
+            title: item.title,
+            date: item.date,
+            completed: false,
+            priority: item.priority,
+            category: item.category
+          });
+        }
+        addedCount++;
+      });
+
+      saveData();
+      renderCalendar();
+      renderTodoList();
+      closeCameraModal();
+      showToast(`¡${addedCount} elementos integrados con IA!`);
+    }
+
+    // ==========================================
+    // TASK EDIT MODAL
+    // ==========================================
+    function openTaskModal() {
+      document.getElementById('taskModalTitle').innerText = 'Crear Tarea o Evento';
+      document.getElementById('editingTaskId').value = '';
+      document.getElementById('taskTitleInput').value = '';
+      document.getElementById('taskDateInput').value = selectedDateStr;
+      document.getElementById('taskTimeInput').value = '';
+      document.getElementById('taskModal').classList.remove('hidden');
+    }
+
+    function openEditTaskModal(id) {
+      const task = appData.tasks.find(t => t.id === id);
+      if (!task) return;
+
+      document.getElementById('taskModalTitle').innerText = 'Editar Tarea';
+      document.getElementById('editingTaskId').value = task.id;
+      document.getElementById('taskTitleInput').value = task.title;
+      document.getElementById('taskDateInput').value = task.date;
+      document.getElementById('taskDestInput').value = 'todo';
+      document.getElementById('taskPriorityInput').value = task.priority || 'medium';
+      document.getElementById('taskCategoryInput').value = task.category || 'General';
+      document.getElementById('taskModal').classList.remove('hidden');
+    }
+
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.add('hidden');
+    }
+
+    function saveManualTask(e) {
+      e.preventDefault();
+      const id = document.getElementById('editingTaskId').value;
+      const title = document.getElementById('taskTitleInput').value.trim();
+      const date = document.getElementById('taskDateInput').value;
+      const time = document.getElementById('taskTimeInput').value;
+      const dest = document.getElementById('taskDestInput').value;
+      const priority = document.getElementById('taskPriorityInput').value;
+      const category = document.getElementById('taskCategoryInput').value;
+
+      if (dest === 'calendar') {
+        appData.events.push({
+          id: 'ev_' + Date.now(),
+          title, date, time, priority, category
+        });
+      } else {
+        if (id) {
+          const t = appData.tasks.find(item => item.id === id);
+          if (t) {
+            t.title = title;
+            t.date = date;
+            t.priority = priority;
+            t.category = category;
+          }
+        } else {
+          appData.tasks.push({
+            id: 'task_' + Date.now(),
+            title, date, completed: false, priority, category
+          });
+        }
+      }
+
+      saveData();
+      renderCalendar();
+      renderTodoList();
+      closeTaskModal();
+      showToast('Guardado correctamente');
+    }
+
+    // EXPORT & COPY FORMATTED TEXT
+    function openExportModal() {
+      document.getElementById('exportModal').classList.remove('hidden');
+      updateExportText();
+    }
+
+    function closeExportModal() {
+      document.getElementById('exportModal').classList.add('hidden');
+    }
+
+    function setExportFormat(fmt) {
+      currentExportFormat = fmt;
+      ['Text', 'Md', 'Json'].forEach(f => {
+        const btn = document.getElementById(`btnExp${f}`);
+        if (f.toLowerCase() === fmt.toLowerCase()) {
+          btn.className = 'flex-1 py-1.5 rounded-lg text-xs font-semibold bg-brand-purple text-white transition-all';
+        } else {
+          btn.className = 'flex-1 py-1.5 rounded-lg text-xs font-semibold bg-white/5 text-white/70 hover:bg-white/10 transition-all';
+        }
+      });
+      updateExportText();
+    }
+
+    function updateExportText() {
+      const area = document.getElementById('exportTextArea');
+      if (currentExportFormat === 'json') {
+        area.value = JSON.stringify(appData, null, 2);
+      } else if (currentExportFormat === 'markdown') {
+        let md = `# Essential Agenda - ${new Date().toLocaleDateString('es-ES')}\n\n`;
+        md += `## 📅 Eventos del Calendario\n`;
+        appData.events.forEach(e => {
+          md += `- **[${e.date} ${e.time || ''}]** ${e.title} _(${e.category})_\n`;
+        });
+        md += `\n## ✅ Lista de Tareas\n`;
+        appData.tasks.forEach(t => {
+          md += `- [${t.completed ? 'x' : ' '}] ${t.title} _(Fecha: ${t.date})_\n`;
+        });
+        area.value = md;
+      } else {
+        let txt = `=== AGENDA ESSENTIAL ===\nFecha: ${new Date().toLocaleDateString('es-ES')}\n\n`;
+        txt += `--- CITAS Y EVENTOS ---\n`;
+        appData.events.forEach(e => {
+          txt += `• [${e.date} ${e.time || ''}] ${e.title}\n`;
+        });
+        txt += `\n--- LISTA DE TAREAS ---\n`;
+        appData.tasks.forEach(t => {
+          txt += `[${t.completed ? 'COMPLETADO' : 'PENDIENTE'}] ${t.title} (${t.date})\n`;
+        });
+        area.value = txt;
+      }
+    }
+
+    function copyExportToClipboard() {
+      const text = document.getElementById('exportTextArea').value;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('¡Texto copiado al portapapeles!');
+      });
+    }
+
+    // ==========================================
+    // PEERJS REALTIME P2P SYNC
+    // ==========================================
+    function openP2PModal() {
+      document.getElementById('p2pModal').classList.remove('hidden');
+    }
+
+    function closeP2PModal() {
+      document.getElementById('p2pModal').classList.add('hidden');
+    }
+
+    function initPeerJS() {
+      peer = new Peer();
+
+      peer.on('open', (id) => {
+        myPeerId = id;
+        document.getElementById('myPeerIdDisplay').innerText = id;
+        
+        // Generate QR Code
+        const qrContainer = document.getElementById('qrcodeContainer');
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, {
+          text: id,
+          width: 128,
+          height: 128
+        });
+      });
+
+      peer.on('connection', (incomingConn) => {
+        conn = incomingConn;
+        setupConnection();
+        showToast('¡Dispositivo conectado por P2P!');
+      });
+
+      peer.on('error', (err) => {
+        console.error("PeerJS Error:", err);
+      });
+    }
+
+    function connectToPeer() {
+      const remoteId = document.getElementById('remotePeerIdInput').value.trim();
+      if (!remoteId) return;
+
+      conn = peer.connect(remoteId);
+      setupConnection();
+      showToast('Conectando P2P...');
+    }
+
+    function setupConnection() {
+      conn.on('open', () => {
+        document.getElementById('p2pDot').className = 'w-2 h-2 rounded-full bg-brand-emerald animate-pulse';
+        document.getElementById('p2pStatusLabel').innerHTML = '<span class="w-2 h-2 rounded-full bg-brand-emerald animate-pulse"></span> P2P Conectado';
+        showToast('¡Sincronización P2P activa!');
+        closeP2PModal();
+        broadcastDataP2P();
+      });
+
+      conn.on('data', (data) => {
+        if (data && data.events && data.tasks) {
+          appData = data;
+          saveData();
+          renderCalendar();
+          renderTodoList();
+          showToast('Agenda sincronizada vía P2P');
+        }
+      });
+    }
+
+    function broadcastDataP2P() {
+      if (conn && conn.open) {
+        conn.send(appData);
+      }
+    }
+
+    // SETTINGS MODAL
+    function openSettingsModal() {
+      document.getElementById('settingsModal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    function saveSettings() {
+      const key = document.getElementById('customApiKeyInput').value.trim();
+      localStorage.setItem('essential_gemini_api_key', key);
+      closeSettingsModal();
+      showToast('Ajustes guardados correctamente');
+    }
+
+    function loadSettings() {
+      const key = localStorage.getItem('essential_gemini_api_key') || '';
+      document.getElementById('customApiKeyInput').value = key;
+    }
+  </script>
+</body>
+</html>
